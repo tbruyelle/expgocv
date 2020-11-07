@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image"
 
 	"gocv.io/x/gocv"
@@ -52,9 +53,45 @@ func main() {
 	gocv.Subtract(sureBG, sureFG8U, &substract)
 	gocv.IMWrite("7.png", substract)
 
-	// Marker labelling (?)
+	// Marker labelling
 	markers := gocv.NewMat()
 	gocv.ConnectedComponents(sureFG8U, &markers)
-	markers.AddUChar(1)
 	gocv.IMWrite("8.png", markers)
+	// Add one to all labels so that sure background is not 0, but 1
+	markers.AddUChar(1)
+	gocv.IMWrite("9.png", markers)
+	// Now, mark the region of unknown with zero
+	for row := 0; row < substract.Rows(); row++ {
+		for col := 0; col < substract.Cols(); col++ {
+			if substract.GetUCharAt(row, col) == 255 {
+				markers.SetIntAt(row, col, 0)
+			}
+		}
+	}
+	gocv.IMWrite("10.png", markers)
+	convert := gocv.NewMat()
+	markers.ConvertTo(&convert, gocv.MatTypeCV8U)
+	colored := gocv.NewMat()
+	gocv.ApplyColorMap(convert, &colored, gocv.ColormapJet)
+	gocv.IMWrite("12.png", colored)
+
+	// apply watershed
+	gocv.Watershed(img, &markers)
+
+	gocv.IMWrite("13.png", markers)
+
+	// update img from markers
+	var m int
+	for row := 0; row < markers.Rows(); row++ {
+		for col := 0; col < markers.Cols(); col++ {
+			if markers.GetIntAt(row, col) == -1 {
+				m++
+				img.SetUCharAt(row, col*3, 0)
+				img.SetUCharAt(row, col*3+1, 0)
+				img.SetUCharAt(row, col*3+2, 255)
+			}
+		}
+	}
+	fmt.Println("updated", m)
+	gocv.IMWrite("final.png", img)
 }
